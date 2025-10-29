@@ -1,0 +1,12 @@
+name: gis_tools
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - xarray
+  - zarr
+  - numcodecs
+  - rioxarray
+  - rasterio
+  - dask
+  - tqdm
