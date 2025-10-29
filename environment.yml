@@ -10,3 +10,9 @@ dependencies:
   - rasterio
   - dask
   - tqdm
+  - geopandas
+  - pyproj
+  - shapely
+  - fiona
+  - pandas
+  - pyarrow

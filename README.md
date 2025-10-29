@@ -23,6 +23,8 @@ A collection of utilities for working with geospatial datasets. The project is c
 
 - **`scripts/zarr_to_geotiff.py`**  
   Converts 2D/3D geospatial arrays stored in Zarr datasets into GeoTIFF rasters.
+- **`scripts/vector_convert.py`**  
+  Universal vector-format converter supporting Shapefile, GeoPackage, GeoJSON, and GeoParquet.
 
 ### `zarr_to_geotiff.py` options
 
@@ -65,13 +67,63 @@ python scripts/zarr_to_geotiff.py \
 
 Generate overviews with cubic resampling and enforce EPSG:32632:
 
-```bash
-python scripts/zarr_to_geotiff.py \
+ ```bash
+ python scripts/zarr_to_geotiff.py \
   /data/scene.zarr \
   outputs/scene.tif \
   --crs EPSG:32632 \
   --pyramids \
   --resampling cubic
+ ```
+
+### `vector_convert.py` options
+
+| Flag | Description |
+| --- | --- |
+| `input` | Source vector dataset path. |
+| `output` | Target dataset path (driver inferred from extension). |
+| `--in-layer` | Layer name to read from multi-layer sources (e.g. GeoPackage). |
+| `--out-layer` | Target layer name for multi-layer outputs. |
+| `--driver` | Explicit output driver name. |
+| `--to-crs` | Reproject output to the specified CRS. |
+| `--encoding` | Output encoding for Shapefiles. |
+| `--explode` | Explode multipart geometries into single-part features. |
+| `--fix` | Attempt to fix invalid geometries (`buffer(0)`). |
+| `--force-2d` | Drop Z values from geometries. |
+| `--bbox` | Bounding box filter `xmin ymin xmax ymax` in source CRS. |
+| `--where` | Attribute filter using a pandas query string. |
+| `--add-metrics` | Add `area_m2` and `perimeter_m` fields. |
+| `--metrics-crs` | CRS used for metrics (auto-picked UTM if omitted). |
+| `--parquet-compression` | Compression codec for GeoParquet outputs. |
+| `--overwrite` | Replace existing output file. |
+
+### `vector_convert.py` usage examples
+
+Convert a Shapefile into GeoParquet:
+
+```bash
+python scripts/vector_convert.py data/input.shp outputs/input.parquet
+```
+
+Reproject, add area/perimeter, and write to GeoPackage:
+
+```bash
+python scripts/vector_convert.py \
+  data/roads.shp \
+  outputs/roads.gpkg \
+  --to-crs EPSG:32632 \
+  --add-metrics
+```
+
+Filter by bounding box, fix geometries, drop Z, and save as GeoJSON:
+
+```bash
+python scripts/vector_convert.py \
+  data/features.parquet \
+  outputs/features.geojson \
+  --bbox 12.2 41.7 12.7 42.0 \
+  --fix \
+  --force-2d
 ```
 
 ## Contributing
