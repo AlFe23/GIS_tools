@@ -1,11 +1,11 @@
 # GIS Tools
 
-A collection of utilities for working with geospatial datasets. The project is currently scaffolded with example scripts and documentation placeholders.
+A collection of utilities for working with geospatial datasets. The project includes tools for data conversion, processing, and image enhancement.
 
 ## Structure
 
 - `scripts/`: Python scripts for data conversion and processing.
-- `examples/`: Example notebooks or walkthroughs demonstrating how to use the tools.
+- `examples/`: Example notebooks and scripts demonstrating how to use the tools.
 
 ## Getting Started
 
@@ -19,12 +19,68 @@ A collection of utilities for working with geospatial datasets. The project is c
    ```
 3. Install any additional dependencies by editing `requirements.txt`.
 
+## Available Tools
+
+### Image Enhancement Tools
+
+The repository includes three main scripts for WorldView image enhancement:
+
+1. **`scripts/gsa_pansharpening.py`**: Implements the GSA (Gram-Schmidt Adaptive) pansharpening algorithm
+2. **`scripts/coregistration.py`**: Handles image coregistration using AROSICS
+3. **`scripts/worldview_enhance.py`**: Complete pipeline combining pansharpening and coregistration
+
+#### Basic Usage
+
+**Pansharpening only:**
+```bash
+python scripts/gsa_pansharpening.py \
+  --ms path/to/multispectral.tif \
+  --pan path/to/panchromatic.tif \
+  --out path/to/output.tif
+```
+
+**Coregistration only:**
+```bash
+python scripts/coregistration.py \
+  --reference path/to/reference.tif \
+  --target path/to/target.tif \
+  --out path/to/output.tif \
+  --grid-res 20 \
+  --max-shift 10
+```
+
+**Complete pipeline:**
+```bash
+python scripts/worldview_enhance.py \
+  --ms path/to/multispectral.tif \
+  --pan path/to/panchromatic.tif \
+  --reference path/to/reference.tif \
+  --out-prefix path/to/output
+```
+
+#### Advanced Usage
+
+The pipeline can be customized to:
+- Run coregistration before pansharpening: `--coregister-first`
+- Skip pansharpening: `--skip-pansharpening`
+- Skip coregistration: `--skip-coregistration`
+
+Example with coregistration first:
+```bash
+python scripts/worldview_enhance.py \
+  --ms path/to/multispectral.tif \
+  --pan path/to/panchromatic.tif \
+  --reference path/to/reference.tif \
+  --out-prefix path/to/output \
+  --coregister-first
+```
+
 ## Scripts
 
 - **`scripts/zarr_to_geotiff.py`**  
   Converts 2D/3D geospatial arrays stored in Zarr datasets into GeoTIFF rasters.
 - **`scripts/vector_convert.py`**  
-  Universal vector-format converter supporting Shapefile, GeoPackage, GeoJSON, and GeoParquet.
+  Universal vector-format converter for Shapefile, GeoPackage, GeoJSON, and GeoParquet. It preserves attributes, optionally repairs geometries, reprojects data, filters features, and can append metric fields in meters using an automatically selected projected CRS.
 
 ### `zarr_to_geotiff.py` options
 
@@ -99,31 +155,81 @@ Generate overviews with cubic resampling and enforce EPSG:32632:
 
 ### `vector_convert.py` usage examples
 
-Convert a Shapefile into GeoParquet:
+#### Flusso di base
+
+Convertire uno shapefile in GeoParquet mantenendo attributi e CRS:
 
 ```bash
 python scripts/vector_convert.py data/input.shp outputs/input.parquet
 ```
 
-Reproject, add area/perimeter, and write to GeoPackage:
+Se l’origine contiene più layer (GeoPackage, FileGDB), specificare il layer di ingresso/uscita:
+
+```bash
+python scripts/vector_convert.py data/source.gpkg outputs/roads.gpkg --in-layer roads --out-layer roads_clean
+```
+
+#### Reproiezione e metriche
+
+Calcolare area e perimetro (m²/m) in un CRS proiettato: se non viene indicato `--metrics-crs`, lo script sceglie automaticamente la zona UTM più adatta in base al baricentro del dataset.
 
 ```bash
 python scripts/vector_convert.py \
-  data/roads.shp \
-  outputs/roads.gpkg \
+  data/landuse.geojson \
+  outputs/landuse_metrics.gpkg \
   --to-crs EPSG:32632 \
   --add-metrics
 ```
 
-Filter by bounding box, fix geometries, drop Z, and save as GeoJSON:
+Per forzare un CRS specifico per i calcoli:
+
+```bash
+python scripts/vector_convert.py \
+  data/landuse.geojson \
+  outputs/landuse_metrics.gpkg \
+  --add-metrics \
+  --metrics-crs EPSG:3035
+```
+
+#### Pulizia geometrie e filtraggio
+
+Riparare geometrie non valide con `--fix`, ridurre a 2D (rimozione quota) e dividere multipart in feature singole:
 
 ```bash
 python scripts/vector_convert.py \
   data/features.parquet \
-  outputs/features.geojson \
-  --bbox 12.2 41.7 12.7 42.0 \
+  outputs/features_2d.geojson \
   --fix \
-  --force-2d
+  --force-2d \
+  --explode
+```
+
+Filtrare per bounding box nello stesso CRS della sorgente e applicare un filtro attributi via Pandas:
+
+```bash
+python scripts/vector_convert.py \
+  data/points.gpkg \
+  outputs/points_filtered.gpkg \
+  --bbox 12.20 41.70 12.70 42.00 \
+  --where "population > 10000 and status == 'city'"
+```
+
+#### Formati e codifiche
+
+Salvare GeoJSON in WGS84 forzando la reproiezione:
+
+```bash
+python scripts/vector_convert.py data/buildings.parquet outputs/buildings.geojson --to-crs EPSG:4326
+```
+
+Esportare in shapefile con encoding Latin-1 e sovrascrivere file esistente:
+
+```bash
+python scripts/vector_convert.py \
+  data/zoning.gpkg \
+  outputs/zoning.shp \
+  --encoding LATIN1 \
+  --overwrite
 ```
 
 ## Contributing
