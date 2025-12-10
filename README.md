@@ -5,6 +5,7 @@ A collection of utilities for working with geospatial datasets. The project incl
 ## Structure
 
 - `scripts/`: Python scripts for data conversion and processing.
+- `scripts/PRISMA/`: Hyperspectral and PRISMA-focused utilities (conversion, mosaicking, automatic coregistration).
 - `examples/`: Example notebooks and scripts demonstrating how to use the tools.
 
 ## Getting Started
@@ -231,6 +232,76 @@ python scripts/vector_convert.py \
   --encoding LATIN1 \
   --overwrite
 ```
+
+## PRISMA Hyperspectral Toolkit
+
+The `scripts/PRISMA` directory collects hyperspectral utilities for PRISMA products, from basic ZIP/HDF5 conversion up to Sentinel-2 aided coregistration. All scripts depend on GDAL, h5py, numpy, and (for the automated coregistration) `arosics`, `requests`, and `scipy`.
+
+### Level-1 processing
+
+- **`scripts/PRISMA/prisma_l1_reader.py`**  
+  Converts a Level-1 ZIP (radiance) into GeoTIFF cubes with embedded wavelength metadata and a quicklook RGB. It accepts either a single ZIP or a directory.
+
+  ```bash
+  python scripts/PRISMA/prisma_l1_reader.py \
+    /data/PRS_L1_STD_OFFL_20240806100501_20240806100506_0001.zip \
+    outputs/prisma_l1
+  ```
+
+- **`scripts/PRISMA/prisma_L1C_geotif.py`**  
+  Lightweight Level-1C converter that creates separate VNIR and SWIR (non-georeferenced) stacks. Import the script and call `main(<path-to-he5>)`, or edit the `filename` placeholder at the bottom before executing it to batch test L1C cubes outside the georeferencing workflow.
+
+### Level-2 reflectance products
+
+- **`scripts/PRISMA/prisma_l2d_reader.py`**  
+  Reads one or more Level-2 ZIP bundles, applies band cleanup, geolocates the cube via the provided latitude/longitude grids, and emits a reflectance GeoTIFF along with a panchromatic image. When invoked with a directory it scans every `*.zip`.
+
+  ```bash
+  python scripts/PRISMA/prisma_l2d_reader.py \
+    /data/prisma/L2/ \
+    outputs/prisma_l2
+  ```
+
+- **`scripts/PRISMA/prisma_l2d_reader_reflectanceconv.py`**  
+  Mirrors the workflow above but explicitly converts stored digital numbers to reflectance by honoring the scaling metadata (`L2Scale*` attributes). Use it when the delivered products ship scaled integers.
+
+### Coregistration workflows
+
+- **`scripts/PRISMA/prisma_coreg_auto.py`**  
+  End-to-end pipeline that (1) processes a Level-2 ZIP, (2) optionally downloads Sentinel-2 L2A mosaics that intersect the PRISMA scene, and (3) coregisters the reflectance cube using `arosics`. Supply Copernicus Data Space credentials via `--s2_user/--s2_password`, or point `--sentinel-safe-dir` to pre-downloaded `.SAFE` folders to skip the download. The resulting mosaic and the PRISMA coregistered stack are written to the chosen output directories.
+
+  ```bash
+  python scripts/PRISMA/prisma_coreg_auto.py \
+    /data/prisma/PRS_L2D_STD_20190609100304_20190609100308_0001.zip \
+    outputs/prisma_l2 \
+    --download-sentinel \
+    --s2_user "<cdse-user>" \
+    --s2_password "<cdse-password>" \
+    --s2_output_dir outputs/sentinel \
+    --coreg-output-dir outputs/prisma_coreg
+  ```
+  Quick WSL-on-Windows launch (C: drive → `/mnt/c`) matching the latest IRIDE test case:
+  ```bash
+  cd /home/esivla/gmatics/GIS_tools
+  python scripts/PRISMA/prisma_coreg_auto.py \
+    /mnt/c/Users/AlviseFerrari/Documents/GMATICS_laptop/AI4SEC/concept/IMG_PRISMA_SENTINEL/02-06-2025/PRS_L2D_STD_20250602093843_20250602093848_0001.zip \
+    /mnt/c/Users/AlviseFerrari/Documents/GMATICS_laptop/AI4SEC/concept/outputs/prisma_l2 \
+    --download-sentinel \
+    --s2_user "alvise.ferrari@uniroma1.it" \
+    --s2_password "GR4wQJ62zduP_D" \
+    --s2_output_dir /mnt/c/Users/AlviseFerrari/Documents/GMATICS_laptop/AI4SEC/concept/outputs/sentinel \
+    --coreg-output-dir /mnt/c/Users/AlviseFerrari/Documents/GMATICS_laptop/AI4SEC/concept/outputs/prisma_coreg
+  ```
+
+  The script exposes additional knobs such as `--s2_start_date/--s2_end_date`, `--s2_max_cloud`, and `--s2_mosaic_path`. Credentials are currently read from the CLI; prefer storing them as environment variables and passing them with shell expansion instead of hardcoding them in the script.
+
+- **`scripts/PRISMA/coreg.py`**  
+  Minimal helper that coregisters one or more GeoTIFF targets to a reference raster using `COREG_LOCAL`. Edit `reference_image_path`, `target_images`, and `output_dir`, then run `python scripts/PRISMA/coreg.py` to reproject and coregister batches that are already on disk.
+
+### Raster cleanup utilities
+
+- **`scripts/PRISMA/sieve_filter.py`**  
+  Wraps GDAL’s sieve filter to enforce a minimum mapping unit (in m²) and, optionally, a minimum feature width on categorical rasters. Import `apply_gdal_sieve` and call it with the input path, desired output, MMU, resolution, and width controls to quickly denoise classification products.
 
 ## Contributing
 
